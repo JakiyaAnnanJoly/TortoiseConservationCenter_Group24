@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tortoise Management - Conservation Center</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin:0; padding:0; }
+    header {
+      background: #4CAF50; color: white; padding: 15px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    header h1 { margin: 0; }
+    header button {
+      background: #fff; border: none; padding: 8px 12px;
+      border-radius: 6px; cursor: pointer;
+    }
+    section { padding: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    .add-btn {
+      margin-bottom: 30px; padding: 8px 14px;
+      background-color: #2196F3; color: white;
+      border: none; border-radius: 6px; cursor: pointer;
+    }
+    .add-btn:hover { background-color: #1976D2; }
+    .chart-container {
+      display: flex; flex-wrap: wrap; justify-content: space-around;
+      gap: 40px; margin-top: 40px;
+    }
+    canvas {
+      background: #fff; border-radius: 12px; padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1); max-width: 450px;
+    }
+    .search-bar {
+      display: flex; justify-content: center; margin: 20px 0;
+    }
+    .search-bar input {
+      padding: 8px;
+      border-radius: 6px 0 0 6px;
+      border: 1px solid #ccc;
+      outline: none;
+      min-width: 250px;
+    }
+    .search-bar button {
+      padding: 8px 12px;
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+    }
+    button.delete-btn {
+      background: #f44336; color: white;
+      border: none; border-radius: 6px;
+      padding: 4px 10px; cursor: pointer;
+    }
+    button.delete-btn:hover { background: #d32f2f; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Tortoise Management</h1>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <section>
+    
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search by Tortoise ID">
+      <button onclick="searchTortoise()">Search</button>
+    </div>
+
+    
+    <h2>General Tortoise Records</h2>
+    <table id="tortoiseTable">
+      <tr>
+        <th>Tortoise ID</th><th>Age</th><th>Health Status</th>
+        <th>Weight (kg)</th><th>Length (cm)</th><th>Category</th>
+        <th>Gender</th><th>Action</th>
+      </tr>
+    </table>
+    <button class="add-btn" onclick="addTortoiseRow()">➕ Add Tortoise</button>
+
+    
+    <h2>New Born Tortoises</h2>
+    <table id="newbornTable">
+      <tr><th>Newborn ID</th><th>Hatch Date</th><th>Weight (g)</th><th>Action</th></tr>
+    </table>
+    <button class="add-btn" onclick="addNewbornRow()">➕ Add Newborn</button>
+
+    <h2>Zubanain (Juveniles)</h2>
+    <table id="juvenileTable">
+      <tr><th>Juvenile ID</th><th>Shell Size (cm)</th><th>Behavior Notes</th><th>Action</th></tr>
+    </table>
+    <button class="add-btn" onclick="addJuvenileRow()">➕ Add Juvenile</button>
+
+    <h2>Adult Tortoises</h2>
+    <table id="adultTable">
+      <tr><th>Adult ID</th><th>Age (Years)</th><th>Maturity Status</th><th>Action</th></tr>
+    </table>
+    <button class="add-btn" onclick="addAdultRow()">➕ Add Adult</button>
+
+    
+    <div class="chart-container">
+      <div>
+        <h3>Tortoise Weights</h3>
+        <canvas id="weightChart"></canvas>
+      </div>
+      <div>
+        <h3>Life Stage Distribution</h3>
+        <canvas id="stageChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    
+    const weightCtx = document.getElementById('weightChart').getContext('2d');
+    const stageCtx = document.getElementById('stageChart').getContext('2d');
+
+    let weightChart = new Chart(weightCtx, {
+      type: 'bar',
+      data: { labels: [], datasets: [{ label: 'Weight (kg)', data: [], backgroundColor: '#4CAF50' }] },
+      options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } }
+    });
+
+    let stageChart = new Chart(stageCtx, {
+      type: 'pie',
+      data: { labels: [], datasets: [{ data: [], backgroundColor: ['#4CAF50','#FF9800','#2196F3'] }] },
+      options: { responsive:true }
+    });
+
+    
+    function saveData(){
+      function collect(tableId,count){
+        const rows=[]; document.querySelectorAll(`#${tableId} tr`).forEach((row,i)=>{
+          if(i===0) return;
+          const cells=row.getElementsByTagName("td");
+          if(cells.length>=count) rows.push([...cells].slice(0,count).map(c=>c.textContent.trim()));
+        }); return rows;
+      }
+      localStorage.setItem("tortoiseRecords",JSON.stringify(collect("tortoiseTable",7)));
+      localStorage.setItem("newbornRecords",JSON.stringify(collect("newbornTable",3)));
+      localStorage.setItem("juvenileRecords",JSON.stringify(collect("juvenileTable",3)));
+      localStorage.setItem("adultRecords",JSON.stringify(collect("adultTable",3)));
+    }
+
+    function loadData(){
+      const t=JSON.parse(localStorage.getItem("tortoiseRecords"));
+      const n=JSON.parse(localStorage.getItem("newbornRecords"));
+      const j=JSON.parse(localStorage.getItem("juvenileRecords"));
+      const a=JSON.parse(localStorage.getItem("adultRecords"));
+      if(t){ t.forEach(r=>addTortoiseRow(r)); }
+      else{ addTortoiseRow(["T01","2","Healthy","1.5","12","Juvenile","Male"]);
+            addTortoiseRow(["T02","5","Fair","4.0","20","Adult","Female"]); }
+      if(n){ n.forEach(r=>addNewbornRow(r)); } else{ addNewbornRow(["N01","2025-06-01","50"]); }
+      if(j){ j.forEach(r=>addJuvenileRow(r)); } else{ addJuvenileRow(["J01","15","Active"]); }
+      if(a){ a.forEach(r=>addAdultRow(r)); } else{ addAdultRow(["A01","7","Mature"]); }
+    }
+
+    
+    function updateCharts() {
+      const rows = document.querySelectorAll("#tortoiseTable tr");
+      const labels = [], data = [];
+      rows.forEach((row,i)=>{
+        if (i===0 || row.style.display==="none") return;
+        const cells=row.getElementsByTagName("td");
+        if (!cells.length) return;
+        labels.push(cells[0].textContent.trim());
+        data.push(parseFloat(cells[3].textContent) || 0);
+      });
+      weightChart.data.labels=labels;
+      weightChart.data.datasets[0].data=data;
+      weightChart.update();
+
+      const stageCounts={};
+      rows.forEach((row,i)=>{
+        if (i===0 || row.style.display==="none") return;
+        const cells=row.getElementsByTagName("td");
+        if (!cells.length) return;
+        const stage=cells[5].textContent.trim();
+        if (!stage) return;
+        stageCounts[stage]=(stageCounts[stage]||0)+1;
+      });
+      stageChart.data.labels=Object.keys(stageCounts);
+      stageChart.data.datasets[0].data=Object.values(stageCounts);
+      stageChart.update();
+
+      saveData(); 
+    }
+
+    
+    function addTortoiseRow(values=["","","","","","",""]){
+      const table=document.getElementById("tortoiseTable");
+      const newRow=table.insertRow(-1);
+      newRow.innerHTML=`
+        <td contenteditable="true">${values[0]}</td><td contenteditable="true">${values[1]}</td>
+        <td contenteditable="true">${values[2]}</td><td contenteditable="true">${values[3]}</td>
+        <td contenteditable="true">${values[4]}</td><td contenteditable="true">${values[5]}</td>
+        <td contenteditable="true">${values[6]}</td>
+        <td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>
+      `;
+      attachLiveUpdate(newRow); updateCharts();
+    }
+    function addNewbornRow(values=["","",""]){
+      const table=document.getElementById("newbornTable");
+      const newRow=table.insertRow(-1);
+      newRow.innerHTML=`<td contenteditable="true">${values[0]}</td><td contenteditable="true">${values[1]}</td><td contenteditable="true">${values[2]}</td><td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>`;
+      attachLiveUpdate(newRow); updateCharts();
+    }
+    function addJuvenileRow(values=["","",""]){
+      const table=document.getElementById("juvenileTable");
+      const newRow=table.insertRow(-1);
+      newRow.innerHTML=`<td contenteditable="true">${values[0]}</td><td contenteditable="true">${values[1]}</td><td contenteditable="true">${values[2]}</td><td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>`;
+      attachLiveUpdate(newRow); updateCharts();
+    }
+    function addAdultRow(values=["","",""]){
+      const table=document.getElementById("adultTable");
+      const newRow=table.insertRow(-1);
+      newRow.innerHTML=`<td contenteditable="true">${values[0]}</td><td contenteditable="true">${values[1]}</td><td contenteditable="true">${values[2]}</td><td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>`;
+      attachLiveUpdate(newRow); updateCharts();
+    }
+
+    
+    function deleteRow(btn){ btn.closest("tr").remove(); updateCharts(); }
+
+    
+    function attachLiveUpdate(row){
+      row.querySelectorAll("td[contenteditable='true']").forEach(cell=>{
+        cell.addEventListener("input", updateCharts);
+      });
+    }
+
+    
+    function searchTortoise(){
+      const input=document.getElementById("searchInput").value.toLowerCase().trim();
+      const rows=document.getElementById("tortoiseTable").getElementsByTagName("tr");
+      for (let i=1;i<rows.length;i++){
+        const idCell=rows[i].getElementsByTagName("td")[0];
+        if (!idCell) continue;
+        const idText=idCell.textContent.toLowerCase();
+        rows[i].style.display=(input===""||idText.includes(input))?"":"none";
+      }
+      updateCharts();
+    }
+    document.getElementById("searchInput").addEventListener("keyup", searchTortoise);
+
+    
+    window.onload=()=>{ loadData(); updateCharts(); };
+    function logout(){ alert("Logged out!"); }
+  </script>
+</body>
+</html>

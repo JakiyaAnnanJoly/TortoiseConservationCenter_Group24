@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enclosure Management - Tortoise Conservation Center</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Chart.js -->
+  <script>checkLogin();</script>
+  <style>
+    body { font-family: Arial, sans-serif; margin:0; padding:0; }
+    header {
+      background: #4CAF50;
+      color: white;
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 { margin: 0; }
+    header button {
+      background: #fff;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    section { padding: 20px; }
+    h2 { margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    .search-bar {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    .search-bar input {
+      padding: 8px;
+      border-radius: 6px 0 0 6px;
+      border: 1px solid #ccc;
+      outline: none;
+      min-width: 250px;
+    }
+    .search-bar button {
+      padding: 8px 12px;
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+    }
+    
+    .add-btn {
+      margin-bottom: 30px;
+      padding: 8px 14px;
+      background-color: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .add-btn:hover { background-color: #1976D2; }
+    
+    .chart-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      gap: 40px;
+      margin-top: 40px;
+    }
+    canvas {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      max-width: 450px;
+    }
+    button.delete-btn {
+      background: #f44336;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    button.delete-btn:hover { background: #d32f2f; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Enclosure Management</h1>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <section>
+    <h2>All Enclosures</h2>
+
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="Search by Enclosure ID">
+      <button onclick="searchEnclosure()">Search</button>
+    </div>
+
+    
+    <h3>Large Enclosures (Houses grown tortoises & Breeding Events)</h3>
+    <table id="largeTable">
+      <tr>
+        <th>Enclosure ID</th>
+        <th>Type</th>
+        <th>Location</th>
+        <th>Large ID</th>
+        <th>Capacity</th>
+        <th>Temperature Control</th>
+        <th>Action</th>
+      </tr>
+    </table>
+    <button class="add-btn" onclick="addLargeRow()">➕ Add Large Enclosure</button>
+
+    
+    <h3>Incubator Enclosures (Hatchlings & New Born)</h3>
+    <table id="incubatorTable">
+      <tr>
+        <th>Enclosure ID</th>
+        <th>Type</th>
+        <th>Location</th>
+        <th>Incubator ID</th>
+        <th>Humidity Level (%)</th>
+        <th>Temperature Range (°C)</th>
+        <th>Action</th>
+      </tr>
+    </table>
+    <button class="add-btn" onclick="addIncubatorRow()">➕ Add Incubator Enclosure</button>
+
+    
+    <div class="chart-container">
+      <div>
+        <h3>Large Enclosures Capacity</h3>
+        <canvas id="barChart"></canvas>
+      </div>
+      <div>
+        <h3>Incubator Enclosures Humidity</h3>
+        <canvas id="pieChart"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const barCtx = document.getElementById('barChart').getContext('2d');
+    const pieCtx = document.getElementById('pieChart').getContext('2d');
+
+    let barChart = new Chart(barCtx, {
+      type: 'bar',
+      data: { labels: [], datasets: [{ label: 'Capacity', data: [], backgroundColor: '#4CAF50' }] },
+      options: { responsive:true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+
+    let pieChart = new Chart(pieCtx, {
+      type: 'pie',
+      data: { labels: [], datasets: [{ data: [], backgroundColor: ['#4CAF50', '#FF9800', '#F44336', '#2196F3'] }] },
+      options: { responsive: true }
+    });
+
+    
+    function saveData() {
+      const data = {
+        large: getTableData("largeTable"),
+        incubator: getTableData("incubatorTable")
+      };
+      localStorage.setItem("enclosureData", JSON.stringify(data));
+    }
+
+    function loadData() {
+      const data = JSON.parse(localStorage.getItem("enclosureData"));
+      if (!data) {
+        
+        document.getElementById("largeTable").insertRow(-1).innerHTML =
+          `<td contenteditable="true">E01</td><td>Large</td><td contenteditable="true">North Wing</td>
+           <td contenteditable="true">L01</td><td contenteditable="true">10</td><td contenteditable="true">Yes</td>
+           <td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>`;
+        document.getElementById("largeTable").insertRow(-1).innerHTML =
+          `<td contenteditable="true">E02</td><td>Large</td><td contenteditable="true">East Wing</td>
+           <td contenteditable="true">L02</td><td contenteditable="true">8</td><td contenteditable="true">No</td>
+           <td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>`;
+        document.getElementById("incubatorTable").insertRow(-1).innerHTML =
+          `<td contenteditable="true">E03</td><td>Incubator</td><td contenteditable="true">West Wing</td>
+           <td contenteditable="true">I01</td><td contenteditable="true">70</td><td contenteditable="true">28-32</td>
+           <td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>`;
+        document.getElementById("incubatorTable").insertRow(-1).innerHTML =
+          `<td contenteditable="true">E04</td><td>Incubator</td><td contenteditable="true">South Wing</td>
+           <td contenteditable="true">I02</td><td contenteditable="true">65</td><td contenteditable="true">27-31</td>
+           <td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>`;
+        attachListeners();
+        updateCharts();
+        saveData();
+        return;
+      }
+
+      loadTable("largeTable", data.large, "Large");
+      loadTable("incubatorTable", data.incubator, "Incubator");
+      updateCharts();
+    }
+
+    function getTableData(tableId) {
+      const rows = document.getElementById(tableId).rows;
+      const data = [];
+      for (let i = 1; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName("td");
+        const rowData = [];
+        for (let j = 0; j < cells.length - 1; j++) { 
+          rowData.push(cells[j].textContent.trim());
+        }
+        data.push(rowData);
+      }
+      return data;
+    }
+
+    function loadTable(tableId, data, type) {
+      const table = document.getElementById(tableId);
+      while (table.rows.length > 1) table.deleteRow(1);
+      data.forEach(rowData => {
+        const newRow = table.insertRow(-1);
+        newRow.innerHTML = rowData.map((cell, i) =>
+          `<td contenteditable="${i !== 1}">${cell}</td>` 
+        ).join("") + `<td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>`;
+        attachLiveUpdate(newRow);
+      });
+    }
+
+    // --- Charts ---
+    function updateCharts() {
+      const largeRows = document.querySelectorAll("#largeTable tr");
+      const largeLabels = [], largeData = [];
+      largeRows.forEach((row, i) => {
+        if (i === 0 || row.style.display === "none") return;
+        const cells = row.getElementsByTagName("td");
+        largeLabels.push(cells[0].textContent);
+        largeData.push(parseInt(cells[4].textContent) || 0);
+      });
+      barChart.data.labels = largeLabels;
+      barChart.data.datasets[0].data = largeData;
+      barChart.update();
+
+      const incRows = document.querySelectorAll("#incubatorTable tr");
+      const incLabels = [], incData = [];
+      incRows.forEach((row, i) => {
+        if (i === 0 || row.style.display === "none") return;
+        const cells = row.getElementsByTagName("td");
+        incLabels.push(cells[0].textContent);
+        incData.push(parseInt(cells[4].textContent) || 0);
+      });
+      pieChart.data.labels = incLabels;
+      pieChart.data.datasets[0].data = incData;
+      pieChart.update();
+
+      saveData(); 
+    }
+
+    
+    function searchEnclosure() {
+      const input = document.getElementById("searchInput").value.toLowerCase().trim();
+      function filterTable(tableId) {
+        const rows = document.getElementById(tableId).getElementsByTagName("tr");
+        for (let i = 1; i < rows.length; i++) {
+          const idCell = rows[i].getElementsByTagName("td")[0];
+          if (!idCell) continue;
+          const idText = idCell.textContent.toLowerCase();
+          rows[i].style.display = (input === "" || idText.includes(input)) ? "" : "none";
+        }
+      }
+      filterTable("largeTable");
+      filterTable("incubatorTable");
+      updateCharts();
+    }
+    document.getElementById("searchInput").addEventListener("keyup", searchEnclosure);
+
+    
+    function addLargeRow() {
+      const table = document.getElementById("largeTable");
+      const newRow = table.insertRow(-1);
+      newRow.innerHTML = `
+        <td contenteditable="true"></td>
+        <td>Large</td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>
+      `;
+      attachLiveUpdate(newRow);
+      updateCharts();
+    }
+
+    function addIncubatorRow() {
+      const table = document.getElementById("incubatorTable");
+      const newRow = table.insertRow(-1);
+      newRow.innerHTML = `
+        <td contenteditable="true"></td>
+        <td>Incubator</td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td contenteditable="true"></td>
+        <td><button class="delete-btn" onclick="deleteRow(this)">🗑️</button></td>
+      `;
+      attachLiveUpdate(newRow);
+      updateCharts();
+    }
+
+    
+    function attachLiveUpdate(row) {
+      row.querySelectorAll("td[contenteditable='true']").forEach(cell => {
+        cell.addEventListener("input", updateCharts);
+      });
+    }
+
+    function attachListeners() {
+      document.querySelectorAll("table tr").forEach((row, i) => {
+        if (i > 0) attachLiveUpdate(row);
+      });
+    }
+
+    
+    function deleteRow(btn) {
+      btn.closest("tr").remove();
+      updateCharts();
+    }
+
+    
+    window.onload = () => { loadData(); };
+  </script>
+</body>
+</html>
